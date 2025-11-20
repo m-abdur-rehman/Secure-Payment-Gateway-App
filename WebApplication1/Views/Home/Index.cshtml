@@ -1,0 +1,45 @@
+﻿@{
+    ViewData["Title"] = "Welcome";
+}
+
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-lg-8 text-center">
+            <h1 class="display-4 mb-4">Secure Payment Gateway</h1>
+            <p class="lead text-muted mb-5">A secure and reliable platform for processing your payments</p>
+            
+            <div class="row g-3 justify-content-center">
+                <div class="col-md-4">
+                    <div class="card h-100 shadow-sm">
+                        <div class="card-body text-center">
+                            <i class="bi bi-credit-card fs-1 text-primary mb-3"></i>
+                            <h5 class="card-title">Make Payment</h5>
+                            <p class="card-text text-muted">Submit a new payment transaction securely</p>
+                            <a asp-controller="Payment" asp-action="Index" class="btn btn-primary">Get Started</a>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card h-100 shadow-sm">
+                        <div class="card-body text-center">
+                            <i class="bi bi-search fs-1 text-info mb-3"></i>
+                            <h5 class="card-title">Lookup Transaction</h5>
+                            <p class="card-text text-muted">Find and view transaction details</p>
+                            <a asp-controller="Payment" asp-action="Lookup" class="btn btn-info">Lookup</a>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card h-100 shadow-sm">
+                        <div class="card-body text-center">
+                            <i class="bi bi-list-ul fs-1 text-dark mb-3"></i>
+                            <h5 class="card-title">All Transactions</h5>
+                            <p class="card-text text-muted">View paginated list of all transactions</p>
+                            <a asp-controller="Payment" asp-action="Transactions" class="btn btn-dark">View All</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

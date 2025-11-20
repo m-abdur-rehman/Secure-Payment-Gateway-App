@@ -1,0 +1,164 @@
+﻿@{
+    ViewData["Title"] = "Transaction Lookup";
+}
+
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-8 col-md-10">
+            <div class="card shadow-sm">
+                <div class="card-header bg-info text-white">
+                    <h4 class="mb-0"><i class="bi bi-search"></i> Transaction Lookup</h4>
+                </div>
+                <div class="card-body">
+                    <div id="alertContainer"></div>
+
+                    <form id="lookupForm" novalidate>
+                        @Html.AntiForgeryToken()
+                        
+                        <div class="mb-3">
+                            <label for="transactionId" class="form-label">Transaction ID <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="transactionId" 
+                                   placeholder="Enter transaction ID" required>
+                            <div class="invalid-feedback">
+                                Please enter a transaction ID.
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="mobile" class="form-label">Mobile Number <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="mobile" 
+                                   placeholder="03XXXXXXXXX" required 
+                                   pattern="03[0-9]{9}">
+                            <div class="invalid-feedback">
+                                Please enter a valid mobile number (03XXXXXXXXX).
+                            </div>
+                        </div>
+
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                            <a asp-controller="Payment" asp-action="Index" class="btn btn-outline-secondary me-md-2">
+                                <i class="bi bi-arrow-left"></i> Back to Payment
+                            </a>
+                            <button type="submit" class="btn btn-info" id="lookupBtn">
+                                <span class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
+                                <i class="bi bi-search"></i> Lookup
+                            </button>
+                        </div>
+                    </form>
+
+                    <div id="resultContainer" class="mt-4 d-none">
+                        <hr>
+                        <h5 class="mb-3">Transaction Details</h5>
+                        <div class="card bg-light">
+                            <div class="card-body" id="resultContent"></div>
+                        </div>
+                    </div>
+
+                    <div class="mt-4 text-center">
+                        <a asp-controller="Payment" asp-action="Transactions" class="btn btn-link">
+                            <i class="bi bi-list-ul"></i> View All Transactions
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        $(document).ready(function() {
+            $("#lookupForm").on("submit", function (e) {
+                e.preventDefault();
+                
+                const form = $(this)[0];
+                if (!form.checkValidity()) {
+                    e.stopPropagation();
+                    $(this).addClass('was-validated');
+                    return;
+                }
+
+                const lookupBtn = $('#lookupBtn');
+                const spinner = lookupBtn.find('.spinner-border');
+                lookupBtn.prop('disabled', true);
+                spinner.removeClass('d-none');
+                $('#resultContainer').addClass('d-none');
+                $('#alertContainer').empty();
+
+                const txId = $("#transactionId").val().trim();
+                const mobile = $("#mobile").val().trim();
+
+                // CSRF token not needed for GET requests, but ensure proper URL encoding
+                // NEVER send tokens in URL - only in headers for POST/PUT/DELETE
+                $.get(`/api/transactions/${encodeURIComponent(txId)}?mobile=${encodeURIComponent(mobile)}`)
+                    .done(function (res) {
+                        // Output encoding to prevent XSS attacks
+                        const txId = $('<div>').text(res.transactionId).html();
+                        const createdAt = $('<div>').text(new Date(res.createdAt).toLocaleString()).html();
+                        const email = $('<div>').text(res.email).html();
+                        const mobile = $('<div>').text(res.mobileNumber).html();
+                        const currency = $('<div>').text(res.originalCurrency).html();
+                        const amountPKR = parseFloat(res.amountPKR).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                        const originalAmount = parseFloat(res.originalAmount).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                        
+                        const resultHtml = `
+                            <div class="row">
+                                <div class="col-md-6 mb-2">
+                                    <strong>Transaction ID:</strong><br>
+                                    <code>${txId}</code>
+                                </div>
+                                <div class="col-md-6 mb-2">
+                                    <strong>Created At:</strong><br>
+                                    ${createdAt}
+                                </div>
+                                <div class="col-md-6 mb-2">
+                                    <strong>Amount (PKR):</strong><br>
+                                    <span class="text-success fw-bold">PKR ${amountPKR}</span>
+                                </div>
+                                <div class="col-md-6 mb-2">
+                                    <strong>Original Amount:</strong><br>
+                                    ${currency} ${originalAmount}
+                                </div>
+                                <div class="col-md-6 mb-2">
+                                    <strong>Email:</strong><br>
+                                    ${email}
+                                </div>
+                                <div class="col-md-6 mb-2">
+                                    <strong>Mobile Number:</strong><br>
+                                    ${mobile}
+                                </div>
+                            </div>
+                        `;
+                        $('#resultContent').html(resultHtml);
+                        $('#resultContainer').removeClass('d-none');
+                        showAlert('success', 'Transaction found successfully!');
+                    })
+                    .fail(function (xhr) {
+                        let msg = 'Transaction not found.';
+                        if (xhr.status === 403) {
+                            msg = 'Mobile number mismatch. Please verify your mobile number.';
+                        } else if (xhr.status === 400) {
+                            msg = 'Invalid request. Please check your input.';
+                        } else if (xhr.status === 404) {
+                            msg = 'Transaction not found with the provided details.';
+                        }
+                        showAlert('danger', msg);
+                        $('#resultContainer').addClass('d-none');
+                    })
+                    .always(function() {
+                        lookupBtn.prop('disabled', false);
+                        spinner.addClass('d-none');
+                    });
+            });
+
+            function showAlert(type, message) {
+                const alertHtml = `
+                    <div class="alert alert-${type} alert-dismissible fade show" role="alert">
+                        ${message}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                `;
+                $('#alertContainer').html(alertHtml);
+            }
+        });
+    </script>
+}

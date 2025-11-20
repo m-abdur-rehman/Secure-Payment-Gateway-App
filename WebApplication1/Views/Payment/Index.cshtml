@@ -1,0 +1,617 @@
+﻿@model PaymentGateway.Models.PaymentViewModel
+@{
+    ViewData["Title"] = "Make Payment";
+}
+
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-8 col-md-10">
+            <div class="card shadow-sm">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0"><i class="bi bi-credit-card"></i> Secure Payment Gateway</h4>
+                </div>
+                <div class="card-body">
+                    <div id="alertContainer"></div>
+                    
+                    <form id="paymentForm" novalidate>
+                        @Html.AntiForgeryToken()
+                        
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="BankAccountNumber" class="form-label">Bank Account Number <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="BankAccountNumber" name="BankAccountNumber" 
+                                       placeholder="Enter account number" required 
+                                       pattern="[0-9]{8,24}" 
+                                       maxlength="24">
+                                <div class="invalid-feedback">
+                                    Please enter a valid bank account number (8-24 digits).
+                                </div>
+                            </div>
+
+                            <div class="col-md-6 mb-3">
+                                <label for="BankName" class="form-label">Bank Name <span class="text-danger">*</span></label>
+                                <select class="form-select" id="BankName" name="BankName" required>
+                                    <option value="">-- Select Bank --</option>
+                                    <option value="HBL">HBL (Habib Bank Limited)</option>
+                                    <option value="UBL">UBL (United Bank Limited)</option>
+                                    <option value="MCB">MCB (Muslim Commercial Bank)</option>
+                                    <option value="Allied">Allied Bank</option>
+                                    <option value="Bank Alfalah">Bank Alfalah</option>
+                                    <option value="Meezan">Meezan Bank</option>
+                                    <option value="Standard Chartered">Standard Chartered</option>
+                                    <option value="Faysal">Faysal Bank</option>
+                                </select>
+                                <div class="invalid-feedback">
+                                    Please select a bank.
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="CNIC" class="form-label">CNIC Number <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="CNIC" name="CNIC" 
+                                       placeholder="xxxxx-xxxxxxx-x" required 
+                                       pattern="\d{5}-\d{7}-\d{1}">
+                                <div class="invalid-feedback">
+                                    CNIC must be in format: xxxxx-xxxxxxx-x
+                                </div>
+                            </div>
+
+                            <div class="col-md-6 mb-3">
+                                <label for="Currency" class="form-label">Currency <span class="text-danger">*</span></label>
+                                <select class="form-select" id="Currency" name="Currency" required>
+                                    <option value="PKR" selected>PKR (Pakistani Rupee)</option>
+                                    <option value="USD">USD (US Dollar)</option>
+                                    <option value="AED">AED (UAE Dirham)</option>
+                                </select>
+                                <div class="invalid-feedback">
+                                    Please select a currency.
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="Amount" class="form-label">Amount <span class="text-danger">*</span></label>
+                                <div class="input-group">
+                                    <span class="input-group-text" id="currencySymbol">PKR</span>
+                                    <input type="text" class="form-control" id="Amount" name="Amount" 
+                                           placeholder="0.00" required 
+                                           pattern="[0-9,]+(\.[0-9]{1,2})?">
+                                </div>
+                                <small class="form-text text-muted" id="amountLimitText">Maximum: PKR 1,000,000</small>
+                                <div class="invalid-feedback">
+                                    Please enter a valid amount within the allowed limit.
+                                </div>
+                            </div>
+
+                            <div class="col-md-6 mb-3">
+                                <label for="Email" class="form-label">Email Address <span class="text-danger">*</span></label>
+                                <input type="email" class="form-control" id="Email" name="Email" 
+                                       placeholder="your.email@example.com" required>
+                                <div class="invalid-feedback">
+                                    Please enter a valid email address.
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="MobileNumber" class="form-label">Mobile Number <span class="text-danger">*</span></label>
+                            <div class="input-group">
+                                <span class="input-group-text">+92</span>
+                                <input type="text" class="form-control" id="MobileNumber" name="MobileNumber" 
+                                       placeholder="XXXXXXXXXX" required 
+                                       maxlength="10"
+                                       pattern="[0-9]{10}">
+                            </div>
+                            <small class="form-text text-muted">Enter 10 digits (e.g., 3001234567)</small>
+                            <div class="invalid-feedback">
+                                Mobile number must be 10 digits.
+                            </div>
+                        </div>
+
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end mt-4">
+                            <a asp-controller="Payment" asp-action="Transactions" class="btn btn-outline-secondary me-md-2">
+                                <i class="bi bi-search"></i> View Transactions
+                            </a>
+                            <button type="submit" class="btn btn-primary" id="submitBtn">
+                                <span class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
+                                Submit Payment
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        $(document).ready(function() {
+            // Currency-specific limits
+            const currencyLimits = {
+                'PKR': { max: 1000000, formatted: '1,000,000', symbol: 'PKR' },
+                'USD': { max: 3500, formatted: '3,500', symbol: 'USD' },
+                'AED': { max: 13000, formatted: '13,000', symbol: 'AED' }
+            };
+
+            // Update currency symbol and limits when currency changes
+            $('#Currency').on('change', function() {
+                const currency = $(this).val() || 'PKR';
+                const limit = currencyLimits[currency] || currencyLimits['PKR'];
+                $('#currencySymbol').text(limit.symbol);
+                $('#amountLimitText').text(`Maximum: ${limit.symbol} ${limit.formatted}`);
+                // Re-validate amount when currency changes
+                validateAmount();
+            });
+
+            // Format number with commas
+            function formatNumberWithCommas(value) {
+                // Remove all non-digit characters except decimal point
+                let numStr = value.toString().replace(/[^\d.]/g, '');
+                
+                // Split into integer and decimal parts
+                const parts = numStr.split('.');
+                let integerPart = parts[0] || '';
+                const decimalPart = parts.length > 1 ? '.' + parts[1].substring(0, 2) : '';
+                
+                // Add commas to integer part
+                integerPart = integerPart.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+                
+                return integerPart + decimalPart;
+            }
+
+            // Remove commas and return numeric value
+            function parseAmount(value) {
+                return parseFloat(value.toString().replace(/,/g, '')) || 0;
+            }
+
+            // Validate amount based on selected currency
+            function validateAmount() {
+                const currency = $('#Currency').val() || 'PKR';
+                const limit = currencyLimits[currency] || currencyLimits['PKR'];
+                const amountInput = $('#Amount');
+                const amountValue = parseAmount(amountInput.val());
+                
+                if (amountValue > limit.max) {
+                    amountInput[0].setCustomValidity(`Amount cannot exceed ${limit.symbol} ${limit.formatted}`);
+                    amountInput.addClass('is-invalid');
+                } else if (amountValue < 0.01) {
+                    amountInput[0].setCustomValidity('Amount must be at least 0.01');
+                    amountInput.addClass('is-invalid');
+                } else {
+                    amountInput[0].setCustomValidity('');
+                    amountInput.removeClass('is-invalid');
+                }
+            }
+
+            // Amount input formatting with commas
+            $('#Amount').on('input', function() {
+                let value = $(this).val();
+                const cursorPos = this.selectionStart;
+                
+                // Format with commas
+                const formatted = formatNumberWithCommas(value);
+                $(this).val(formatted);
+                
+                // Restore cursor position (adjust for added commas)
+                const diff = formatted.length - value.length;
+                this.setSelectionRange(cursorPos + diff, cursorPos + diff);
+                
+                // Validate amount
+                validateAmount();
+            });
+
+            // Amount on blur - ensure proper formatting
+            $('#Amount').on('blur', function() {
+                const amountValue = parseAmount($(this).val());
+                if (amountValue > 0) {
+                    $(this).val(formatNumberWithCommas(amountValue.toFixed(2)));
+                }
+                validateAmount();
+            });
+
+            // Bank Account Number - only allow numbers
+            $('#BankAccountNumber').on('input', function() {
+                // Remove all non-numeric characters
+                let value = $(this).val().replace(/\D/g, '');
+                // Enforce max length (24 digits)
+                if (value.length > 24) {
+                    value = value.substring(0, 24);
+                }
+                $(this).val(value);
+            });
+
+            // Bank Account Number - prevent non-numeric keypress
+            $('#BankAccountNumber').on('keypress', function(e) {
+                // Allow: backspace, delete, tab, escape, enter
+                if ([46, 8, 9, 27, 13].indexOf(e.keyCode) !== -1 ||
+                    // Allow: Ctrl+A, Ctrl+C, Ctrl+V, Ctrl+X
+                    (e.keyCode === 65 && e.ctrlKey === true) ||
+                    (e.keyCode === 67 && e.ctrlKey === true) ||
+                    (e.keyCode === 86 && e.ctrlKey === true) ||
+                    (e.keyCode === 88 && e.ctrlKey === true) ||
+                    // Allow: home, end, left, right
+                    (e.keyCode >= 35 && e.keyCode <= 39)) {
+                    return;
+                }
+                // Block everything except numbers (0-9)
+                if ((e.shiftKey || (e.keyCode < 48 || e.keyCode > 57)) && (e.keyCode < 96 || e.keyCode > 105)) {
+                    e.preventDefault();
+                    return false;
+                }
+            });
+
+            // Bank Account Number - prevent paste of non-numeric content
+            $('#BankAccountNumber').on('paste', function(e) {
+                const pastedData = (e.originalEvent || e).clipboardData.getData('text/plain');
+                // Remove all non-numeric characters from pasted content
+                const cleaned = pastedData.replace(/\D/g, '').substring(0, 24);
+                if (pastedData !== cleaned) {
+                    e.preventDefault();
+                    $(this).val(cleaned);
+                    return false;
+                }
+            });
+
+            // Email input restrictions - prevent dangerous characters
+            $('#Email').on('input', function() {
+                let value = $(this).val();
+                // Remove potentially dangerous characters: < > " ' & script tags
+                value = value.replace(/[<>"']/g, '');
+                // Remove script tags
+                value = value.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
+                $(this).val(value);
+            });
+
+            // Email keypress restrictions
+            $('#Email').on('keypress', function(e) {
+                // Block dangerous characters: < > " '
+                const forbiddenChars = [60, 62, 34, 39]; // < > " '
+                if (forbiddenChars.indexOf(e.keyCode) !== -1) {
+                    e.preventDefault();
+                    return false;
+                }
+            });
+
+            // Transaction ID input restrictions (for lookup form - will be added to Transactions page)
+            // Email paste prevention
+            $('#Email').on('paste', function(e) {
+                const pastedData = (e.originalEvent || e).clipboardData.getData('text/plain');
+                // Remove dangerous characters from pasted content
+                const cleaned = pastedData.replace(/[<>"']/g, '').replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
+                if (pastedData !== cleaned) {
+                    e.preventDefault();
+                    $(this).val($(this).val() + cleaned);
+                    return false;
+                }
+            });
+
+            // CNIC formatting
+            $('#CNIC').on('input', function() {
+                let value = $(this).val().replace(/\D/g, '');
+                if (value.length > 0) {
+                    if (value.length <= 5) {
+                        value = value;
+                    } else if (value.length <= 12) {
+                        value = value.substring(0, 5) + '-' + value.substring(5);
+                    } else {
+                        value = value.substring(0, 5) + '-' + value.substring(5, 12) + '-' + value.substring(12, 13);
+                    }
+                }
+                $(this).val(value);
+            });
+
+            // Mobile number formatting - only numbers, max 10 digits
+            $('#MobileNumber').on('input', function() {
+                // Remove all non-numeric characters
+                let value = $(this).val().replace(/\D/g, '');
+                // Limit to 10 digits
+                if (value.length > 10) {
+                    value = value.substring(0, 10);
+                }
+                $(this).val(value);
+            });
+
+            // Prevent non-numeric input on mobile field
+            $('#MobileNumber').on('keypress', function(e) {
+                // Allow: backspace, delete, tab, escape, enter
+                if ([46, 8, 9, 27, 13].indexOf(e.keyCode) !== -1 ||
+                    // Allow: Ctrl+A, Ctrl+C, Ctrl+V, Ctrl+X
+                    (e.keyCode === 65 && e.ctrlKey === true) ||
+                    (e.keyCode === 67 && e.ctrlKey === true) ||
+                    (e.keyCode === 86 && e.ctrlKey === true) ||
+                    (e.keyCode === 88 && e.ctrlKey === true) ||
+                    // Allow: home, end, left, right
+                    (e.keyCode >= 35 && e.keyCode <= 39)) {
+                    return;
+                }
+                // Ensure that it is a number and stop the keypress
+                if ((e.shiftKey || (e.keyCode < 48 || e.keyCode > 57)) && (e.keyCode < 96 || e.keyCode > 105)) {
+                    e.preventDefault();
+                }
+            });
+
+            // Form submission
+            $('#paymentForm').on('submit', function(e) {
+                e.preventDefault();
+                
+                // Validate amount before form submission
+                validateAmount();
+                
+                const form = $(this)[0];
+                if (!form.checkValidity()) {
+                    e.stopPropagation();
+                    $(this).addClass('was-validated');
+                    return;
+                }
+
+                const submitBtn = $('#submitBtn');
+                const spinner = submitBtn.find('.spinner-border');
+                submitBtn.prop('disabled', true);
+                spinner.removeClass('d-none');
+
+                // Convert mobile to international format (+92XXXXXXXXXX)
+                const mobileDigits = $('#MobileNumber').val().replace(/\D/g, '');
+                const mobileInternational = mobileDigits.length === 10 ? '+92' + mobileDigits : mobileDigits;
+
+                // Parse amount (remove commas)
+                const amountValue = parseAmount($('#Amount').val());
+                
+                // Generate idempotency key (UUID v4) to prevent duplicate payments
+                // Store in sessionStorage to reuse on retry
+                let idempotencyKey = sessionStorage.getItem('payment_idempotency_key');
+                if (!idempotencyKey) {
+                    // Generate UUID v4
+                    idempotencyKey = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+                        const r = Math.random() * 16 | 0;
+                        const v = c == 'x' ? r : (r & 0x3 | 0x8);
+                        return v.toString(16);
+                    });
+                    sessionStorage.setItem('payment_idempotency_key', idempotencyKey);
+                }
+                
+                const formData = {
+                    BankAccountNumber: $('#BankAccountNumber').val(),
+                    BankName: $('#BankName').val(),
+                    CNIC: $('#CNIC').val(),
+                    Currency: $('#Currency').val(),
+                    Amount: amountValue,
+                    Email: $('#Email').val(),
+                    MobileNumber: mobileInternational,
+                    Address: 'N/A',
+                    IdempotencyKey: idempotencyKey
+                };
+
+                // Get anti-forgery token from hidden form field (NEVER in URL)
+                const token = $('input[name="__RequestVerificationToken"]').val();
+                
+                if (!token) {
+                    showAlert('danger', 'Security token missing. Please refresh the page and try again.', false);
+                    submitBtn.prop('disabled', false);
+                    spinner.addClass('d-none');
+                    return;
+                }
+
+                $.ajax({
+                    url: '/api/transactions',
+                    type: 'POST',
+                    contentType: 'application/json',
+                    headers: {
+                        'X-CSRF-TOKEN': token // Token in header only, NEVER in URL
+                    },
+                    data: JSON.stringify(formData),
+                    success: function(response) {
+                        // Output encoding to prevent XSS
+                        const txId = $('<div>').text(response.transactionId).html();
+                        const rawTxId = response.transactionId; // Store raw ID for copying
+                        const createdAt = $('<div>').text(new Date(response.createdAt).toLocaleString()).html();
+                        
+                        // Create copy button with data attribute (more secure than inline onclick)
+                        const copyButtonHtml = `
+                            <button type="button" class="btn btn-sm btn-primary ms-2 copy-tx-id-btn" 
+                                    data-tx-id="${$('<div>').text(rawTxId).html()}" 
+                                    title="Copy Transaction ID">
+                                <i class="bi bi-clipboard"></i> Copy
+                            </button>
+                        `;
+                        
+                        showAlert('success', 
+                            `Payment submitted successfully!<br>
+                            <div class="d-flex align-items-center mt-2">
+                                <strong>Transaction ID:</strong> 
+                                <code class="ms-2 me-2">${txId}</code>
+                                ${copyButtonHtml}
+                            </div>
+                            <strong>Created:</strong> ${createdAt}<br><br>
+                            <a href="/Payment/Transactions" class="btn btn-sm btn-info mt-2">View Transactions</a>`,
+                            true);
+                        
+                        // Attach click handler to copy button (using event delegation)
+                        $('.copy-tx-id-btn').off('click').on('click', function() {
+                            const txIdToCopy = $(this).data('tx-id');
+                            copyTransactionId(txIdToCopy);
+                        });
+                        
+                        $('#paymentForm')[0].reset();
+                        $('#paymentForm').removeClass('was-validated');
+                        $('#currencySymbol').text('PKR');
+                        $('#amountLimitText').text('Maximum: PKR 1,000,000');
+                        $('#Currency').val('PKR'); // Reset to PKR
+                        // Clear idempotency key after successful payment
+                        sessionStorage.removeItem('payment_idempotency_key');
+                    },
+                    error: function(xhr) {
+                        let errorMsg = 'An error occurred while processing your payment.';
+                        let alertType = 'danger';
+                        
+                        // Handle rate limit exceeded (HTTP 429)
+                        if (xhr.status === 429) {
+                            errorMsg = '<strong>Rate Limit Exceeded</strong><br>You have submitted too many payment requests. Please wait a minute before trying again.';
+                            alertType = 'warning';
+                            // Show toast notification
+                            showRateLimitToast();
+                        } 
+                        // Handle service unavailable (503) - Forex API issues
+                        else if (xhr.status === 503) {
+                            errorMsg = '<strong>Currency Conversion Service Unavailable</strong><br>Unable to connect to currency conversion service. Please try again in a few moments.';
+                            alertType = 'warning';
+                        }
+                        // Handle server errors (500) with specific messages
+                        else if (xhr.status === 500 && xhr.responseJSON) {
+                            if (xhr.responseJSON.error) {
+                                errorMsg = xhr.responseJSON.error;
+                                if (xhr.responseJSON.details) {
+                                    errorMsg += '<br><small>' + xhr.responseJSON.details + '</small>';
+                                }
+                            }
+                        }
+                        else if (xhr.responseJSON) {
+                            if (xhr.responseJSON.error) {
+                                errorMsg = xhr.responseJSON.error;
+                            } else if (xhr.responseJSON.errors) {
+                                // Format validation errors in user-friendly way
+                                const errorList = [];
+                                for (const field in xhr.responseJSON.errors) {
+                                    const fieldErrors = xhr.responseJSON.errors[field];
+                                    if (Array.isArray(fieldErrors)) {
+                                        errorList.push(...fieldErrors);
+                                    }
+                                }
+                                if (errorList.length > 0) {
+                                    errorMsg = '<strong>Please fix the following errors:</strong><br>' + errorList.join('<br>');
+                                }
+                            } else if (xhr.responseJSON.message) {
+                                errorMsg = xhr.responseJSON.message;
+                            }
+                        } else if (xhr.status === 400) {
+                            errorMsg = 'Invalid form data. Please check all fields.';
+                        } else if (xhr.status === 500) {
+                            errorMsg = 'Server error. Please try again later.';
+                        }
+                        showAlert(alertType, errorMsg, false);
+                    },
+                    complete: function() {
+                        submitBtn.prop('disabled', false);
+                        spinner.addClass('d-none');
+                    }
+                });
+            });
+
+            function showAlert(type, message, isSuccess) {
+                const alertHtml = `
+                    <div class="alert alert-${type} alert-dismissible fade show" role="alert">
+                        ${message}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                `;
+                $('#alertContainer').html(alertHtml);
+                // Removed auto-dismiss timer - message stays visible until user closes it
+            }
+
+            // Copy Transaction ID to clipboard (secure implementation)
+            function copyTransactionId(transactionId) {
+                // Use modern Clipboard API (secure and recommended)
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(transactionId).then(function() {
+                        // Show success feedback
+                        showCopyFeedback('Transaction ID copied to clipboard!', 'success');
+                        // Update button icon to show success
+                        $('.copy-tx-id-btn i').removeClass('bi-clipboard').addClass('bi-check-circle');
+                        setTimeout(function() {
+                            $('.copy-tx-id-btn i').removeClass('bi-check-circle').addClass('bi-clipboard');
+                        }, 2000);
+                    }).catch(function(err) {
+                        // Fallback for clipboard errors
+                        console.error('Failed to copy:', err);
+                        fallbackCopyTextToClipboard(transactionId);
+                    });
+                } else {
+                    // Fallback for older browsers
+                    fallbackCopyTextToClipboard(transactionId);
+                }
+            }
+
+            // Fallback copy method for older browsers
+            function fallbackCopyTextToClipboard(text) {
+                const textArea = document.createElement("textarea");
+                textArea.value = text;
+                textArea.style.position = "fixed";
+                textArea.style.left = "-999999px";
+                textArea.style.top = "-999999px";
+                document.body.appendChild(textArea);
+                textArea.focus();
+                textArea.select();
+                
+                try {
+                    const successful = document.execCommand('copy');
+                    if (successful) {
+                        showCopyFeedback('Transaction ID copied to clipboard!', 'success');
+                    } else {
+                        showCopyFeedback('Failed to copy. Please select and copy manually.', 'warning');
+                    }
+                } catch (err) {
+                    console.error('Fallback copy failed:', err);
+                    showCopyFeedback('Copy not supported. Please select and copy manually.', 'warning');
+                }
+                
+                document.body.removeChild(textArea);
+            }
+
+            // Show copy feedback message
+            function showCopyFeedback(message, type) {
+                const feedbackHtml = `
+                    <div class="alert alert-${type} alert-dismissible fade show position-fixed top-0 start-50 translate-middle-x mt-3" 
+                         style="z-index: 9999; min-width: 300px;" role="alert">
+                        <i class="bi bi-${type === 'success' ? 'check-circle' : 'exclamation-triangle'}"></i> ${message}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                `;
+                $('body').append(feedbackHtml);
+                
+                // Auto-dismiss after 3 seconds
+                setTimeout(function() {
+                    $('.alert.position-fixed').fadeOut(function() {
+                        $(this).remove();
+                    });
+                }, 3000);
+            }
+
+            // Show rate limit exceeded toast notification
+            function showRateLimitToast() {
+                const toastHtml = `
+                    <div class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 10000;">
+                        <div id="rateLimitToast" class="toast show" role="alert" aria-live="assertive" aria-atomic="true">
+                            <div class="toast-header bg-warning text-dark">
+                                <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                                <strong class="me-auto">Rate Limit Exceeded</strong>
+                                <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
+                            </div>
+                            <div class="toast-body">
+                                <strong>Too many requests!</strong><br>
+                                You have exceeded the rate limit of 10 payments per minute.<br>
+                                Please wait 60 seconds before submitting another payment.
+                            </div>
+                        </div>
+                    </div>
+                `;
+                
+                // Remove any existing toast first
+                $('.toast-container').remove();
+                
+                // Add new toast
+                $('body').append(toastHtml);
+                
+                // Auto-dismiss after 8 seconds
+                setTimeout(function() {
+                    $('#rateLimitToast').toast('hide');
+                    setTimeout(function() {
+                        $('.toast-container').remove();
+                    }, 300);
+                }, 8000);
+            }
+        });
+    </script>
+}

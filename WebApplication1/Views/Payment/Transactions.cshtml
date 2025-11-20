@@ -1,0 +1,361 @@
+﻿@{
+    ViewData["Title"] = "Transactions";
+}
+
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-12">
+            <!-- Lookup Section -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-info text-white">
+                    <h4 class="mb-0"><i class="bi bi-search"></i> Lookup Transaction</h4>
+                </div>
+                <div class="card-body">
+                    <div id="lookupAlertContainer"></div>
+
+                    <form id="lookupForm" novalidate>
+                        @Html.AntiForgeryToken()
+                        
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="transactionId" class="form-label">Transaction ID <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="transactionId" 
+                                       placeholder="Enter transaction ID" required
+                                       maxlength="40">
+                                <small class="form-text text-muted"></small>
+                                <div class="invalid-feedback">
+                                    Please enter a valid transaction ID.
+                                </div>
+                            </div>
+
+                            <div class="col-md-6 mb-3">
+                                <label for="mobile" class="form-label">Mobile Number <span class="text-danger">*</span></label>
+                                <div class="input-group">
+                                    <span class="input-group-text">+92</span>
+                                    <input type="text" class="form-control" id="mobile" 
+                                           placeholder="XXXXXXXXXX" required 
+                                           maxlength="10"
+                                           pattern="[0-9]{10}">
+                                </div>
+                                <small class="form-text text-muted">Enter 10 digits (e.g., 3001234567)</small>
+                                <div class="invalid-feedback">
+                                    Mobile number must be 10 digits.
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                            <button type="submit" class="btn btn-info" id="lookupBtn">
+                                <span class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
+                                <i class="bi bi-search"></i> Lookup
+                            </button>
+                        </div>
+                    </form>
+
+                    <div id="lookupResultContainer" class="mt-4 d-none">
+                        <hr>
+                        <h5 class="mb-3">Transaction Details</h5>
+                        <div class="card bg-light">
+                            <div class="card-body" id="lookupResultContent"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        $(document).ready(function() {
+            // Transaction ID input restrictions - prevent dangerous characters and enforce length
+            $('#transactionId').on('input', function() {
+                let value = $(this).val();
+                // Remove potentially dangerous characters: < > " ' & script tags
+                value = value.replace(/[<>"']/g, '');
+                // Remove script tags
+                value = value.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
+                // Enforce max length (40 characters)
+                if (value.length > 40) {
+                    value = value.substring(0, 40);
+                }
+                $(this).val(value);
+            });
+
+            // Transaction ID keypress restrictions
+            $('#transactionId').on('keypress', function(e) {
+                // Block dangerous characters: < > " '
+                const forbiddenChars = [60, 62, 34, 39]; // < > " '
+                if (forbiddenChars.indexOf(e.keyCode) !== -1) {
+                    e.preventDefault();
+                    return false;
+                }
+            });
+
+            // Transaction ID paste prevention
+            $('#transactionId').on('paste', function(e) {
+                const pastedData = (e.originalEvent || e).clipboardData.getData('text/plain');
+                // Remove dangerous characters from pasted content
+                const cleaned = pastedData.replace(/[<>"']/g, '').replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
+                if (pastedData !== cleaned) {
+                    e.preventDefault();
+                    $(this).val($(this).val() + cleaned);
+                    return false;
+                }
+            });
+
+            // Mobile number formatting - only numbers, max 10 digits
+            $('#mobile').on('input', function() {
+                let value = $(this).val().replace(/\D/g, '');
+                if (value.length > 10) {
+                    value = value.substring(0, 10);
+                }
+                $(this).val(value);
+            });
+
+            // Prevent non-numeric input on mobile field
+            $('#mobile').on('keypress', function(e) {
+                if ([46, 8, 9, 27, 13].indexOf(e.keyCode) !== -1 ||
+                    (e.keyCode === 65 && e.ctrlKey === true) ||
+                    (e.keyCode === 67 && e.ctrlKey === true) ||
+                    (e.keyCode === 86 && e.ctrlKey === true) ||
+                    (e.keyCode === 88 && e.ctrlKey === true) ||
+                    (e.keyCode >= 35 && e.keyCode <= 39)) {
+                    return;
+                }
+                if ((e.shiftKey || (e.keyCode < 48 || e.keyCode > 57)) && (e.keyCode < 96 || e.keyCode > 105)) {
+                    e.preventDefault();
+                }
+            });
+
+            // Format mobile number for display (international format)
+            function formatMobileNumber(mobile) {
+                if (!mobile) return '';
+                // Remove all non-digits
+                const digits = mobile.replace(/\D/g, '');
+                // If 10 digits, format as +92XXXXXXXXXX
+                if (digits.length === 10) {
+                    return '+92' + digits;
+                }
+                // If already has +92, return as is
+                if (mobile.startsWith('+92')) {
+                    return mobile;
+                }
+                // If starts with 0, convert to +92
+                if (mobile.startsWith('0') && digits.length === 11) {
+                    return '+92' + digits.substring(1);
+                }
+                return mobile;
+            }
+
+            // Lookup functionality
+            $("#lookupForm").on("submit", function (e) {
+                e.preventDefault();
+                
+                const form = $(this)[0];
+                if (!form.checkValidity()) {
+                    e.stopPropagation();
+                    $(this).addClass('was-validated');
+                    return;
+                }
+
+                const lookupBtn = $('#lookupBtn');
+                const spinner = lookupBtn.find('.spinner-border');
+                lookupBtn.prop('disabled', true);
+                spinner.removeClass('d-none');
+                $('#lookupResultContainer').addClass('d-none');
+                $('#lookupAlertContainer').empty();
+
+                const txId = $("#transactionId").val().trim();
+                const mobileDigits = $("#mobile").val().trim().replace(/\D/g, '');
+                // Convert to international format for lookup
+                const mobile = mobileDigits.length === 10 ? '+92' + mobileDigits : mobileDigits;
+
+                $.get(`/api/transactions/${encodeURIComponent(txId)}?mobile=${encodeURIComponent(mobile)}`)
+                    .done(function (res) {
+                        // Output encoding to prevent XSS attacks
+                        const txIdEncoded = $('<div>').text(res.transactionId).html();
+                        const createdAt = $('<div>').text(new Date(res.createdAt).toLocaleString()).html();
+                        const email = $('<div>').text(res.email).html();
+                        const mobileEncoded = $('<div>').text(res.mobileNumber).html();
+                        const currency = $('<div>').text(res.originalCurrency).html();
+                        const amountPKR = parseFloat(res.amountPKR).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                        const originalAmount = parseFloat(res.originalAmount).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                        
+                        const resultHtml = `
+                            <div class="row">
+                                <div class="col-md-6 mb-2">
+                                    <strong>Transaction ID:</strong><br>
+                                    <code>${txIdEncoded}</code>
+                                </div>
+                                <div class="col-md-6 mb-2">
+                                    <strong>Created At:</strong><br>
+                                    ${createdAt}
+                                </div>
+                                <div class="col-md-6 mb-2">
+                                    <strong>Amount (PKR):</strong><br>
+                                    <span class="text-success fw-bold">PKR ${amountPKR}</span>
+                                </div>
+                                <div class="col-md-6 mb-2">
+                                    <strong>Original Amount:</strong><br>
+                                    ${currency} ${originalAmount}
+                                </div>
+                                <div class="col-md-6 mb-2">
+                                    <strong>Email:</strong><br>
+                                    ${email}
+                                </div>
+                                <div class="col-md-6 mb-2">
+                                    <strong>Mobile Number:</strong><br>
+                                    ${formatMobileNumber(mobileEncoded)}
+                                </div>
+                            </div>
+                        `;
+                        $('#lookupResultContent').html(resultHtml);
+                        $('#lookupResultContainer').removeClass('d-none');
+                        showLookupAlert('success', 'Transaction found successfully!');
+                    })
+                    .fail(function (xhr) {
+                        let msg = 'Transaction not found.';
+                        if (xhr.status === 403) {
+                            msg = 'Mobile number mismatch. Please verify your mobile number.';
+                        } else if (xhr.status === 400) {
+                            msg = 'Invalid request. Please check your input.';
+                        } else if (xhr.status === 404) {
+                            msg = 'Transaction not found with the provided details.';
+                        }
+                        showLookupAlert('danger', msg);
+                        $('#lookupResultContainer').addClass('d-none');
+                    })
+                    .always(function() {
+                        lookupBtn.prop('disabled', false);
+                        spinner.addClass('d-none');
+                    });
+            });
+
+            function showLookupAlert(type, message) {
+                const alertHtml = `
+                    <div class="alert alert-${type} alert-dismissible fade show" role="alert">
+                        ${message}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                `;
+                $('#lookupAlertContainer').html(alertHtml);
+            }
+
+            // Transactions list functionality
+            let page = 1;
+            const pageSize = 20;
+            let totalPages = 1;
+            let isLoading = false;
+
+            function loadTransactions() {
+                if (isLoading) return;
+
+                isLoading = true;
+                $("#prevBtn, #nextBtn").prop("disabled", true);
+                const tbody = $("#tableBody");
+                tbody.html(`
+                    <tr>
+                        <td colspan="5" class="text-center">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                        </td>
+                    </tr>
+                `);
+
+                $.get(`/api/transactions?page=${page}&pageSize=${pageSize}`)
+                    .done(function (res) {
+                        tbody.empty();
+
+                        if (res.items && res.items.length > 0) {
+                            res.items.forEach((tx, index) => {
+                                // Output encoding to prevent XSS
+                                const txId = $('<div>').text(tx.transactionId).html();
+                                const createdAt = $('<div>').text(new Date(tx.createdAt).toLocaleString()).html();
+                                const email = $('<div>').text(tx.email).html();
+                                const mobile = $('<div>').text(tx.mobileNumber).html();
+                                const amountPKR = parseFloat(tx.amountPKR).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                                
+                                const rowClass = index % 2 === 0 ? '' : 'table-active';
+                                tbody.append(`
+                                    <tr class="${rowClass}">
+                                        <td><code class="text-primary">${txId}</code></td>
+                                        <td>${createdAt}</td>
+                                        <td class="text-end">
+                                            <span class="text-success fw-bold">
+                                                PKR ${amountPKR}
+                                            </span>
+                                        </td>
+                                        <td>${email}</td>
+                                        <td>${formatMobileNumber(mobile)}</td>
+                                    </tr>
+                                `);
+                            });
+                            
+                            totalPages = Math.ceil(res.total / pageSize);
+                            updatePagination();
+                        } else {
+                            tbody.append(`
+                                <tr>
+                                    <td colspan="5" class="text-center text-muted">
+                                        No transactions found.
+                                    </td>
+                                </tr>
+                            `);
+                        }
+                    })
+                    .fail(function (xhr) {
+                        tbody.html(`
+                            <tr>
+                                <td colspan="5" class="text-center text-danger">
+                                    <i class="bi bi-exclamation-triangle"></i> Error loading transactions. Please try again.
+                                </td>
+                            </tr>
+                        `);
+                        showAlert('danger', 'Failed to load transactions. Please try again.');
+                    })
+                    .always(function () {
+                        isLoading = false;
+                        setTimeout(() => {
+                            $("#prevBtn, #nextBtn").prop("disabled", false);
+                            updatePagination();
+                        }, 300);
+                    });
+            }
+
+            function updatePagination() {
+                $('#pageInfo').text(`Page ${page} of ${totalPages}`);
+                $('#prevBtn').prop('disabled', page <= 1 || isLoading);
+                $('#nextBtn').prop('disabled', page >= totalPages || isLoading);
+            }
+
+            function showAlert(type, message) {
+                const alertHtml = `
+                    <div class="alert alert-${type} alert-dismissible fade show" role="alert">
+                        ${message}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                `;
+                $('#alertContainer').html(alertHtml);
+            }
+
+            $("#prevBtn").click(function () {
+                if (page > 1 && !isLoading) {
+                    page--;
+                    loadTransactions();
+                }
+            });
+
+            $("#nextBtn").click(function () {
+                if (page < totalPages && !isLoading) {
+                    page++;
+                    loadTransactions();
+                }
+            });
+
+            // Load initial page
+            loadTransactions();
+        });
+    </script>
+}
