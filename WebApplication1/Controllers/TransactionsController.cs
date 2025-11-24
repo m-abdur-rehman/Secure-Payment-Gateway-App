@@ -157,8 +157,7 @@ namespace PaymentGateway.Controllers
                     HttpContext.TraceIdentifier);
                 
                 return StatusCode(500, new { 
-                    error = "Currency conversion failed. Please check your configuration or try again later.",
-                    details = ex.Message
+                    error = "An exception occured. Please try again later."
                 });
             }
             catch (HttpRequestException ex)
@@ -167,7 +166,7 @@ namespace PaymentGateway.Controllers
                     HttpContext.TraceIdentifier);
                 
                 return StatusCode(503, new { 
-                    error = "Unable to connect to currency conversion service. Please try again later."
+                    error = "An exception occured. Please try again later."
                 });
             }
             catch (Exception ex)

@@ -42,7 +42,7 @@ namespace WebApplication1.Middleware
             context.Response.Headers.Add("Permissions-Policy", 
                 "geolocation=(), microphone=(), camera=(), payment=(), usb=(), magnetometer=(), gyroscope=(), accelerometer=()");
 
-            if (context.Request.IsHttps)
+            if (context.Request.IsHttps && !context.Response.Headers.ContainsKey("Strict-Transport-Security"))
             {
                 context.Response.Headers.Add("Strict-Transport-Security", 
                     "max-age=31536000; includeSubDomains; preload");

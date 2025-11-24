@@ -1,0 +1,14 @@
+bin/
+obj/
+.vs/
+.vscode/
+*.user
+*.suo
+*.log
+.git/
+.gitignore
+README.md
+*.md
+.env
+.env.local
+
